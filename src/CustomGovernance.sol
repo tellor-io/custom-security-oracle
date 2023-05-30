@@ -2,26 +2,34 @@
 
 pragma solidity ^0.8.17;
 
+import "./interfaces/IExtraSecurityOracle.sol";
+import "./interfaces/ITellorGovernance.sol";
+
 
 contract CustomGovernance {
-    address public extraSecurityOracle;
-    address public tellorGovernance;
+    IExtraSecurityOracle public extraSecurityOracle;
+    ITellorGovernance public tellorGovernance;
+
 
     constructor(
         address _extraSecurityOracle,
         address _tellorGovernance
     ) {
-        extraSecurityOracle = _extraSecurityOracle;
-        tellorGovernance = _tellorGovernance;
+        extraSecurityOracle = IExtraSecurityOracle(_extraSecurityOracle);
+        tellorGovernance = ITellorGovernance(_tellorGovernance);
     }
 
-    function beginDispute() public {
-        // lock tokens in extra security oracle (call extraSecurityOracle.slashReporter())
-        // call tellorGovernance.beginDispute()
+    function beginDispute(bytes32 _queryId, uint256 _timestamp) public {
+        // todo: ensure can't begin dispute if already in dispute ? if vote round > 1 ?
+        // todo: collect dispute fee from msg.sender
+        extraSecurityOracle.slashReporter(address(0), address(0)); // todo: replace with proper reporter and recipient addresses
+        tellorGovernance.beginDispute(_queryId, _timestamp);
     }
 
     function executeVote() public {
-        // get vote result from tellorGovernance
-        // give tokens to winning party
+        // call and get executed status and vote result from tellorGovernance.getVoteInfo()
+        (,,bool executed, ITellorGovernance.VoteResult result,) = tellorGovernance.getVoteInfo();
+        require(executed, "Vote not executed");
+        // todo: give tokens to proper parties
     }
 }

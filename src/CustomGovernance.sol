@@ -27,9 +27,8 @@ contract CustomGovernance {
     }
 
     function executeVote() public {
-        // call and get executed status and vote result from tellorGovernance.getVoteInfo()
-        (,,bool executed, ITellorGovernance.VoteResult result,) = tellorGovernance.getVoteInfo();
-        require(executed, "Vote not executed");
+        (,,bool _executed, ITellorGovernance.VoteResult _result,) = tellorGovernance.getVoteInfo();
+        require(_executed, "Vote not executed");
         // todo: give tokens to proper parties
     }
 }

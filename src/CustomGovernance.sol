@@ -20,13 +20,19 @@ contract CustomGovernance {
     struct Dispute {
         bytes32 queryId; // query ID of disputed value
         uint256 timestamp; // timestamp of disputed value
-        bytes value; // disputed value
         address initiator; // address which initiated dispute
         address disputedReporter; // reporter who submitted the disputed value
         uint256 slashedAmount; // amount of tokens slashed from reporter
         uint256 fee; // fee paid to initiate dispute
     }
 
+    // Events
+    event NewDispute(
+        uint256 _disputeId,
+        bytes32 _queryId,
+        uint256 _timestamp,
+        address _reporter
+    );
     event VoteExecuted(uint256 _disputeId, ITellorGovernance.VoteResult _result);
 
 
@@ -41,17 +47,47 @@ contract CustomGovernance {
     }
 
     function beginDispute(bytes32 _queryId, uint256 _timestamp) public {
-        // Ensure value actually exists
         require(
             tellorOracle.getBlockNumberByTimestamp(_queryId, _timestamp) != 0,
             "no value exists at given timestamp"
         );
-        // todo: generate dispute ID
-        // get vote info from governance contract
-        // ensure can't begin dispute if already in dispute
-        // todo: collect dispute fee from msg.sender
-        oracle.slashReporter(address(0), address(0)); // todo: replace with proper reporter and recipient addresses
+        bytes32 _hash = keccak256(abi.encodePacked(_queryId, _timestamp));
+        require(
+            tellorGovernance.getVoteRounds(_hash).length == 0,
+            "vote already in progress"
+        );
+
+        // Save dispute info
+        uint256 _disputeId = tellorGovernance.getVoteCount() + 1;
+        Dispute storage _thisDispute = disputeInfo[_disputeId];
+        _thisDispute.queryId = _queryId;
+        _thisDispute.timestamp = _timestamp;
+        _thisDispute.initiator = msg.sender;
+        _thisDispute.disputedReporter = tellorOracle.getReporterByTimestamp(
+            _queryId,
+            _timestamp
+        );
+
+        uint256 _disputeFee = getDisputeFee();
+        require(
+            token.transferFrom(msg.sender, address(this), _disputeFee),
+            "Fee must be paid"
+        );
+        uint256 _slashedAmount = oracle.slashReporter(
+            _thisDispute.disputedReporter,
+            address(this)
+        );
         tellorGovernance.beginDispute(_queryId, _timestamp);
+
+        _thisDispute.slashedAmount = _slashedAmount;
+        _thisDispute.fee = _disputeFee;
+
+        emit NewDispute(
+            _disputeId,
+            _queryId,
+            _timestamp,
+            _thisDispute.disputedReporter
+        );
     }
 
     function executeVote(uint256 _disputeId) public {
@@ -80,5 +116,12 @@ contract CustomGovernance {
             token.transfer(_thisDispute.disputedReporter, _thisDispute.fee + _thisDispute.slashedAmount);
         }
         emit VoteExecuted(_disputeId, _result);
+    }
+
+    /**
+     * @dev Get the latest dispute fee
+     */
+    function getDisputeFee() public view returns (uint256) {
+        return (oracle.getStakeAmount() / 10);
     }
 }

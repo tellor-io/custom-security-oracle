@@ -213,4 +213,8 @@ contract ExtraSecurityOracle {
     function getTellorAddress() external view returns (address) {
         return address(tellor);
     }
+
+    function getStakeAmount() external view returns (uint256) {
+        return stakeAmount;
+    }
 }

@@ -13,6 +13,7 @@ contract ExtraSecurityOracle {
     uint256 public minimumStakeAmount;
     uint256 public stakeAmount;
     uint256 public reportingLock;
+    // todo: add & implement min usd stake amount (stakeAmountDollarTarget). User can set to zero to disable.
 
     mapping(address => StakeInfo) private stakerDetails; // mapping from a persons address to their staking info
 
@@ -202,5 +203,14 @@ contract ExtraSecurityOracle {
         // toWithdraw -= _staker.lockedBalance;
         _staker.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
+    }
+
+    /// GETTERS ///
+    function getTokenAddress() external view returns (address) {
+        return address(token);
+    }
+
+    function getTellorAddress() external view returns (address) {
+        return address(tellor);
     }
 }

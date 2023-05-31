@@ -55,7 +55,7 @@ contract CustomGovernance {
         require(
             tellorGovernance.getVoteRounds(_hash).length == 0,
             "vote already in progress"
-        );
+        ); // Should revert if there's already a voting round open for the disputed value
 
         // Save dispute info
         uint256 _disputeId = tellorGovernance.getVoteCount() + 1;
@@ -112,7 +112,7 @@ contract CustomGovernance {
                 _thisDispute.slashedAmount
             );
         } else if (_result == ITellorGovernance.VoteResult.FAILED) {
-            // If vote is in dispute and fails, iterate through each vote round and transfer the dispute fee to disputed reporter
+            // If vote is in dispute and fails, return slashed tokens to reporter and give dispute fee to reporter
             token.transfer(_thisDispute.disputedReporter, _thisDispute.fee + _thisDispute.slashedAmount);
         }
         emit VoteExecuted(_disputeId, _result);

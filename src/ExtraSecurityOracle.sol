@@ -93,16 +93,17 @@ contract ExtraSecurityOracle {
             // if locked balance + staked balance is at least stakeAmount,
             // slash from locked balance and slash remainder from staked balance
             _slashAmount = stakeAmount;
+            _staker.stakedBalance -= stakeAmount - _lockedBalance;
             _staker.lockedBalance = 0;
         } else {
             // if sum(locked balance + staked balance) is less than stakeAmount,
             // slash sum
             _slashAmount = _stakedBalance + _lockedBalance;
+            _staker.stakedBalance = 0;
             _staker.lockedBalance = 0;
         }
         require(token.transfer(_recipient, _slashAmount));
         emit ReporterSlashed(_reporter, _recipient, _slashAmount);
-        return _slashAmount;
     }
 
     /**
@@ -132,7 +133,7 @@ contract ExtraSecurityOracle {
         } else {
             require(token.transferFrom(msg.sender, address(this), _amount));
         }
-        _staker.stakedBalance = _amount;
+        _staker.stakedBalance += _amount;
         _staker.startDate = block.timestamp; // This resets the staker start date to now
         emit NewStaker(msg.sender, _amount);
     }

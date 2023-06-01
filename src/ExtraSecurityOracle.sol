@@ -3,11 +3,12 @@
 pragma solidity ^0.8.17;
 
 import "./interfaces/IERC20.sol";
+import "./interfaces/ITellorOracle.sol";
 
 
 contract ExtraSecurityOracle {
     address public owner;
-    address public tellor;
+    ITellorOracle public tellor;
     address public governance;
     IERC20 public token;
     uint256 public minimumStakeAmount;
@@ -40,7 +41,7 @@ contract ExtraSecurityOracle {
         uint256 _minimumStakeAmount,
         uint256 _reportingLock
     ) {
-        tellor = _tellor;
+        tellor = ITellorOracle(_tellor);
         token = IERC20(_token);
         minimumStakeAmount = _minimumStakeAmount;
         stakeAmount = _minimumStakeAmount; // todo: need to be determined using fixed dollar amount, or just use minimumStakeAmount?
@@ -62,10 +63,40 @@ contract ExtraSecurityOracle {
         governance = _governanceAddress;
     }
 
-    function getDataBefore() public {
-        // todo: get data from tellor reported by someone both staked on tellor oracle and staked on this contract
-        // todo: call tellor.getDataBefore()
-        // todo: then do binary search to find a value that was reported by someone who's also staked on this contract
+    function getDataBefore(bytes32 _queryId, uint256 _timestamp) public view returns (
+            bool _ifRetrieve,
+            bytes memory _value,
+            uint256 _timestampRetrieved
+        ) {
+        // get data from tellor reported by someone both staked on tellor oracle and staked on this contract
+        // check if Tellor oracle has value reported before given timestamp
+        (bool _found, uint256 _index) = tellor.getIndexForDataBefore(
+        _queryId,
+        _timestamp
+        );
+        if (!_found) return (false, bytes(""), 0);
+    
+        // check if Tellor oracle has a value reported by someone who's also staked on this contract
+        // do binary search to find a value that was reported by someone who's also staked on this contract
+        // todo: this assumes `reports` array in TellorFlex is sorted by timestamp
+        uint256 _low = 0;
+        uint256 _high = _index;
+        while (_low < _high) {
+            uint256 _mid = (_low + _high) / 2;
+            _timestampRetrieved = tellor.getTimestampbyQueryIdandIndex(_queryId, _mid);
+            address _reporter = tellor.getReporterByTimestamp(_queryId, _timestampRetrieved);
+            if (stakerDetails[_reporter].staked) {
+                _high = _mid; // todo: fix / where you left off
+            } else {
+                _low = _mid + 1; // todo: fix
+            }
+        }
+        _timestampRetrieved = tellor.getTimestampbyQueryIdandIndex(_queryId, _low);
+        if (_timestampRetrieved > _timestamp) return (false, bytes(""), 0);
+
+
+        _value = tellor.retrieveData(_queryId, _timestampRetrieved);
+        return (true, _value, _timestampRetrieved);
     }
 
     /**

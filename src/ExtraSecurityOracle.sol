@@ -77,26 +77,23 @@ contract ExtraSecurityOracle {
         if (!_found) return (false, bytes(""), 0);
     
         // check if Tellor oracle has a value reported by someone who's also staked on this contract
-        // do binary search to find a value that was reported by someone who's also staked on this contract
-        // todo: this assumes `reports` array in TellorFlex is sorted by timestamp
-        uint256 _low = 0;
-        uint256 _high = _index;
-        while (_low < _high) {
-            uint256 _mid = (_low + _high) / 2;
-            _timestampRetrieved = tellor.getTimestampbyQueryIdandIndex(_queryId, _mid);
+        // iterate backwards from index for data before to find a value that was reported by someone who's also staked on this contract
+        while (_index >= 0) { // todo: check if should limit the number of iterations
+            _timestampRetrieved = tellor.getTimestampbyQueryIdandIndex(
+                _queryId,
+                _index
+            );
             address _reporter = tellor.getReporterByTimestamp(_queryId, _timestampRetrieved);
             if (stakerDetails[_reporter].staked) {
-                _high = _mid; // todo: fix / where you left off
-            } else {
-                _low = _mid + 1; // todo: fix
+                // if the reporter is staked on this contract, return the value
+                return (
+                    true,
+                    tellor.retrieveData(_queryId, _index),
+                    _timestampRetrieved
+                );
             }
+            _index--;
         }
-        _timestampRetrieved = tellor.getTimestampbyQueryIdandIndex(_queryId, _low);
-        if (_timestampRetrieved > _timestamp) return (false, bytes(""), 0);
-
-
-        _value = tellor.retrieveData(_queryId, _timestampRetrieved);
-        return (true, _value, _timestampRetrieved);
     }
 
     /**

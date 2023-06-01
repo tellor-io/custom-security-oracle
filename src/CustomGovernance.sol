@@ -77,7 +77,7 @@ contract CustomGovernance {
             _thisDispute.disputedReporter,
             address(this)
         );
-        tellorGovernance.beginDispute(_queryId, _timestamp);
+        tellorGovernance.beginDispute(_queryId, _timestamp); // todo: don't call this if already dispute open on tellor side
 
         _thisDispute.slashedAmount = _slashedAmount;
         _thisDispute.fee = _disputeFee;
@@ -90,7 +90,7 @@ contract CustomGovernance {
         );
     }
 
-    function executeVote(uint256 _disputeId) public {
+    function executeVote(uint256 _disputeId) public { // tddo: make sure this is getting the final dispute id of the last voting round, and that can fetch the original slash/fee 
         (,,bool _executed, ITellorGovernance.VoteResult _result,) = tellorGovernance.getVoteInfo(_disputeId);
         require(_executed, "Vote not executed");
 

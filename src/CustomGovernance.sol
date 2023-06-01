@@ -2,14 +2,14 @@
 
 pragma solidity ^0.8.17;
 
-import "./interfaces/IExtraSecurityOracle.sol";
+import "./interfaces/IRibeye.sol";
 import "./interfaces/ITellorGovernance.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/ITellorOracle.sol";
 
 
 contract CustomGovernance {
-    IExtraSecurityOracle public oracle;
+    IRibeye public oracle;
     IERC20 public token; // token used for dispute fees, same as reporter staking token
     ITellorGovernance public tellorGovernance;
     ITellorOracle public tellorOracle;
@@ -40,7 +40,7 @@ contract CustomGovernance {
         address _oracle,
         address _tellorGovernance
     ) {
-        oracle = IExtraSecurityOracle(_oracle);
+        oracle = IRibeye(_oracle);
         token = IERC20(oracle.getTokenAddress());
         tellorGovernance = ITellorGovernance(_tellorGovernance);
         tellorOracle = ITellorOracle(oracle.getTellorAddress());

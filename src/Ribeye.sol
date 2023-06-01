@@ -6,7 +6,7 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/ITellorOracle.sol";
 
 
-contract ExtraSecurityOracle {
+contract Ribeye { // more stake
     address public owner;
     ITellorOracle public tellor;
     address public governance;

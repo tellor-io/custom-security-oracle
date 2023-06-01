@@ -13,8 +13,8 @@ contract ExtraSecurityOracle {
     IERC20 public token;
     uint256 public minimumStakeAmount;
     uint256 public stakeAmount;
-    uint256 public reportingLock;
-    // todo: add & implement min usd stake amount (stakeAmountDollarTarget). User can set to zero to disable.
+    uint256 public stakeAmountDollarTarget;
+    bytes32 public stakingTokenPriceQueryId;
 
     mapping(address => StakeInfo) private stakerDetails; // mapping from a persons address to their staking info
 
@@ -33,20 +33,32 @@ contract ExtraSecurityOracle {
         address _recipient,
         uint256 _slashAmount
     );
+    event NewStakeAmount(uint256 _newStakeAmount);
 
 
     constructor(
         address _tellor,
         address _token,
+        uint256 _stakeAmountDollarTarget, // set to zero to disable and use minimumStakeAmount
+        uint256 _stakingTokenPrice,
         uint256 _minimumStakeAmount,
-        uint256 _reportingLock
+        bytes32 _stakingTokenPriceQueryId
     ) {
+        require(_token != address(0), "must set token address");
+        require(_stakingTokenPrice > 0, "must set staking token price");
+        require(_stakingTokenPriceQueryId != bytes32(0), "must set staking token price queryId");
         tellor = ITellorOracle(_tellor);
         token = IERC20(_token);
-        minimumStakeAmount = _minimumStakeAmount;
-        stakeAmount = _minimumStakeAmount; // todo: need to be determined using fixed dollar amount, or just use minimumStakeAmount?
-        reportingLock = _reportingLock;
         owner = msg.sender;
+        stakeAmountDollarTarget = _stakeAmountDollarTarget;
+        minimumStakeAmount = _minimumStakeAmount;
+        uint256 _potentialStakeAmount = (_stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
+        if(_potentialStakeAmount < _minimumStakeAmount) {
+            stakeAmount = _minimumStakeAmount;
+        } else {
+            stakeAmount = _potentialStakeAmount;
+        }
+        stakingTokenPriceQueryId = _stakingTokenPriceQueryId;
     }
 
     /**
@@ -199,6 +211,33 @@ contract ExtraSecurityOracle {
         require(token.transfer(msg.sender, _staker.lockedBalance));
         _staker.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
+    }
+
+    /**
+     * @dev Updates the stake amount after retrieving the latest
+     * 12+-hour-old staking token price from the oracle
+     */
+    function updateStakeAmount() external {
+        // get staking token price
+        (bool _valFound, bytes memory _val, ) = tellor.getDataBefore(
+            stakingTokenPriceQueryId,
+            block.timestamp - 12 hours
+        );
+        if (_valFound) {
+            uint256 _stakingTokenPrice = abi.decode(_val, (uint256));
+            require(
+                _stakingTokenPrice >= 0.01 ether && _stakingTokenPrice < 1000000 ether,
+                "invalid staking token price"
+            ); // todo: check if these bounds are reasonable for non-TRB staking tokens
+
+            uint256 _adjustedStakeAmount = (stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
+            if(_adjustedStakeAmount < minimumStakeAmount) {
+                stakeAmount = minimumStakeAmount;
+            } else {
+                stakeAmount = _adjustedStakeAmount;
+            }
+            emit NewStakeAmount(stakeAmount);
+        }
     }
 
     /// GETTERS ///

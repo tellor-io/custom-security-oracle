@@ -7,4 +7,10 @@ interface ITellorOracle {
     function getIndexForDataBefore(bytes32 _queryId, uint256 _timestamp) external view returns (bool, uint256);
     function getTimestampbyQueryIdandIndex(bytes32 _queryId, uint256 _index) external view returns (uint256);
     function retrieveData(bytes32 _queryId, uint256 _timestamp) external view returns (bytes memory);
+    function getDataBefore(bytes32 _queryId, uint256 _timestamp) external view returns (
+        bool _ifRetrieve,
+        bytes memory _value,
+        uint256 _timestampRetrieved
+    );
+    
 }

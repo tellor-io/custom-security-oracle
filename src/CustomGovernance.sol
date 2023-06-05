@@ -2,19 +2,19 @@
 
 pragma solidity ^0.8.17;
 
-import "./interfaces/IExtraSecurityOracle.sol";
+import "./interfaces/IRibeye.sol";
 import "./interfaces/ITellorGovernance.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/ITellorOracle.sol";
 
 
 contract CustomGovernance {
-    IExtraSecurityOracle public oracle;
+    IRibeye public oracle;
     IERC20 public token; // token used for dispute fees, same as reporter staking token
     ITellorGovernance public tellorGovernance;
     ITellorOracle public tellorOracle;
 
-    mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
+    mapping(bytes32 => Dispute) private disputeInfo; // mapping of unique identifier to the details of the dispute
 
     // Structs
     struct Dispute {
@@ -28,19 +28,19 @@ contract CustomGovernance {
 
     // Events
     event NewDispute(
-        uint256 _disputeId,
+        bytes32 _hash,
         bytes32 _queryId,
         uint256 _timestamp,
         address _reporter
     );
-    event VoteExecuted(uint256 _disputeId, ITellorGovernance.VoteResult _result);
+    event VoteExecuted(bytes32 _hash, ITellorGovernance.VoteResult _result);
 
 
     constructor(
         address _oracle,
         address _tellorGovernance
     ) {
-        oracle = IExtraSecurityOracle(_oracle);
+        oracle = IRibeye(_oracle);
         token = IERC20(oracle.getTokenAddress());
         tellorGovernance = ITellorGovernance(_tellorGovernance);
         tellorOracle = ITellorOracle(oracle.getTellorAddress());
@@ -52,14 +52,9 @@ contract CustomGovernance {
             "no value exists at given timestamp"
         );
         bytes32 _hash = keccak256(abi.encodePacked(_queryId, _timestamp));
-        require(
-            tellorGovernance.getVoteRounds(_hash).length == 0,
-            "vote already in progress"
-        ); // Should revert if there's already a voting round open for the disputed value
 
         // Save dispute info
-        uint256 _disputeId = tellorGovernance.getVoteCount() + 1;
-        Dispute storage _thisDispute = disputeInfo[_disputeId];
+        Dispute storage _thisDispute = disputeInfo[_hash];
         _thisDispute.queryId = _queryId;
         _thisDispute.timestamp = _timestamp;
         _thisDispute.initiator = msg.sender;
@@ -77,24 +72,28 @@ contract CustomGovernance {
             _thisDispute.disputedReporter,
             address(this)
         );
-        tellorGovernance.beginDispute(_queryId, _timestamp); // todo: don't call this if already dispute open on tellor side
+        if (tellorGovernance.getVoteRounds(_hash).length == 0) {
+            tellorGovernance.beginDispute(_queryId, _timestamp);
+        }
 
         _thisDispute.slashedAmount = _slashedAmount;
         _thisDispute.fee = _disputeFee;
 
         emit NewDispute(
-            _disputeId,
+            _hash,
             _queryId,
             _timestamp,
             _thisDispute.disputedReporter
         );
     }
 
-    function executeVote(uint256 _disputeId) public { // tddo: make sure this is getting the final dispute id of the last voting round, and that can fetch the original slash/fee 
-        (,,bool _executed, ITellorGovernance.VoteResult _result,) = tellorGovernance.getVoteInfo(_disputeId);
+    function executeVote(bytes32 _queryId, uint256 _timestamp) public {
+        bytes32 _hash = keccak256(abi.encodePacked(_queryId, _timestamp));
+        uint256 _disputeIdLastRound = tellorGovernance.getVoteRounds(_hash)[tellorGovernance.getVoteRounds(_hash).length - 1];
+        (,,bool _executed, ITellorGovernance.VoteResult _result,) = tellorGovernance.getVoteInfo(_disputeIdLastRound);
         require(_executed, "Vote not executed");
 
-        Dispute storage _thisDispute = disputeInfo[_disputeId];
+        Dispute storage _thisDispute = disputeInfo[_hash];
         if (_result == ITellorGovernance.VoteResult.PASSED) {
             // Return fee to dispute initiator
             token.transfer(_thisDispute.initiator, _thisDispute.fee);
@@ -115,7 +114,7 @@ contract CustomGovernance {
             // If vote is in dispute and fails, return slashed tokens to reporter and give dispute fee to reporter
             token.transfer(_thisDispute.disputedReporter, _thisDispute.fee + _thisDispute.slashedAmount);
         }
-        emit VoteExecuted(_disputeId, _result);
+        emit VoteExecuted(_hash, _result);
     }
 
     /**

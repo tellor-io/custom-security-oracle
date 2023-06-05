@@ -6,7 +6,7 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/ITellorOracle.sol";
 
 
-contract ExtraSecurityOracle {
+contract Ribeye { // more stake
     address public owner;
     ITellorOracle public tellor;
     address public governance;
@@ -90,7 +90,7 @@ contract ExtraSecurityOracle {
     
         // check if Tellor oracle has a value reported by someone who's also staked on this contract
         // iterate backwards from index for data before to find a value that was reported by someone who's also staked on this contract
-        while (_index >= 0) { // todo: check if should limit the number of iterations
+        while (_index >= 0) {
             _timestampRetrieved = tellor.getTimestampbyQueryIdandIndex(
                 _queryId,
                 _index
@@ -228,7 +228,7 @@ contract ExtraSecurityOracle {
             require(
                 _stakingTokenPrice >= 0.01 ether && _stakingTokenPrice < 1000000 ether,
                 "invalid staking token price"
-            ); // todo: check if these bounds are reasonable for non-TRB staking tokens
+            );
 
             uint256 _adjustedStakeAmount = (stakeAmountDollarTarget * 1e18) / _stakingTokenPrice;
             if(_adjustedStakeAmount < minimumStakeAmount) {
